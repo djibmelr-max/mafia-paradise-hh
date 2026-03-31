@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>لعبة المافيا - Game Master</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: url('https://images.unsplash.com/photo-1549924231-f129b911e442?auto=format&fit=crop&w=1350&q=80') no-repeat center center fixed;
+    background-size: cover;
+    color: white;
+    text-align: center;
+  }
+  button { margin: 5px; padding: 8px 15px; }
+  input { padding: 5px; margin: 3px; }
+</style>
+</head>
+<body>
+
+<h1>🎭 لعبة المافيا</h1>
+
+<div id="entry">
+  <h2>أدخل اسمك للانضمام:</h2>
+  <input id="playerName" placeholder="اسم اللاعب">
+  <button onclick="joinGame()">انضم للعبة</button>
+  <div id="playerList"></div>
+  <br>
+  <button onclick="startAsGameMaster()">ابدأ اللعبة كحكم</button>
+</div>
+
+<div id="game" style="display:none;"></div>
+
+<script>
+let players = [];
+let roles = [];
+let alive = [];
+let gameMaster = null;
+let playerRoles = {};
+let silencedPlayer = null;
+let protectedPlayer = null;
+let doctorChances = 3;
+
+// الانضمام للعبة
+function joinGame() {
+  let name = document.getElementById('playerName').value.trim();
+  if(name && !players.includes(name)) {
+    players.push(name);
+    alive.push(name);
+    document.getElementById('playerList').innerHTML = "اللاعبين: " + players.join(', ');
+  }
+}
+
+// بدء اللعبة كحكم
+function startAsGameMaster() {
+  if(players.length < 4) { alert("لازم على الأقل 4 لاعبين"); return; }
+  gameMaster = prompt("اكتب اسمك كحكم:").trim();
+  if(!players.includes(gameMaster)) { alert("اسمك لازم يكون ضمن اللاعبين"); return; }
+  assignRoles();
+  document.getElementById('entry').style.display = "none";
+  showRolesToPlayers();
+}
+
+// توزيع الأدوار
+function assignRoles() {
+  let baseRoles = ["رئيس المافيا","مساعد المافيا","مافيا","العمدة","البيوعي","المسعف"];
+  while(baseRoles.length < players.length) { baseRoles.push("مواطن"); }
+  baseRoles = baseRoles.sort(() => Math.random()-0.5);
+  players.forEach((p,i) => playerRoles[p] = baseRoles[i]);
+}
+
+// عرض الدور لكل لاعب
+function showRolesToPlayers() {
+  let html = "<h2>🎯 الأدوار</h2>";
+  players.forEach(p => {
+    html += `<p>${p}: ${playerRoles[p]}</p>`;
+  });
+  html += `<br><button onclick="nightPhase()">🌙 ابدأ الليل</button>`;
+  document.getElementById('game').style.display = "block";
+  document.getElementById('game').innerHTML = html;
+}
+
+// 🌙 الليل
+function nightPhase() {
+  let html = "<h2>🌙 الليل</h2>";
+
+  // المافيا تختار الضحية
+  html += "<h3>🔪 المافيا تختار:</h3>";
+  alive.forEach(p => { html += `<button onclick="killPlayer('${p}')">${p}</button>`; });
+
+  // المساعد يسكت
+  html += "<h3>🤫 المساعد يسكت:</h3>";
+  alive.forEach(p => { html += `<button onclick="silence('${p}')">${p}</button>`; });
+
+  // العمدة يكشف
+  html += "<h3>👑 العمدة يكشف:</h3>";
+  alive.forEach(p => { html += `<button onclick="reveal('${p}')">${p}</button>`; });
+
+  // المسعف يحمي
+  if(doctorChances > 0){
+    html += `<h3>🩺 المسعف (${doctorChances} فرص) يحمي:</h3>`;
+    alive.forEach(p => { html += `<button onclick="protect('${p}')">${p}</button>`; });
+  }
+
+  // عرض الأموات كمشاهدين
+  html += "<h3>👀 المشاهدين:</h3>";
+  players.forEach(p => { if(!alive.includes(p)) html += p + "<br>"; });
+
+  document.getElementById('game').innerHTML = html;
+}
+
+// قتل لاعب
+function killPlayer(name){
+  if(!alive.includes(name)) return;
+  if(name===protectedPlayer){ alert("🛡️ تم إنقاذ " + name); }
+  else {
+    alert("💀 مات " + name);
+    alive = alive.filter(p=>p!==name);
+    if(playerRoles[name]==="البيوعي"){
+      let target = prompt("⚠️ البيوعي يختار واحد يموت معه:");
+      if(alive.includes(target)){
+        alert("💥 " + target + " مات مع البيوعي");
+        alive = alive.filter(p=>p!==target);
+      }
+    }
+  }
+  dayPhase();
+}
+
+// إسكات لاعب
+function silence(name){ if(alive.includes(name)){ silencedPlayer=name; alert("🤫 تم إسكات " + name); } }
+
+// كشف العمدة
+function reveal(name){ if(alive.includes(name)){ let role = playerRoles[name]; alert(role.includes("مافيا")?"❗ هذا من المافيا":"✅ هذا مش مافيا"); } }
+
+// حماية المسعف
+function protect(name){ if(alive.includes(name)&&doctorChances>0){ protectedPlayer=name; doctorChances--; alert("🩺 تم حماية " + name); } }
+
+// ☀️ النهار والتصويت
+function dayPhase(){
+  let html = "<h2>☀️ النهار - التصويت</h2>";
+  alive.forEach(p=>{
+    if(p!==silencedPlayer){ html+=`<button onclick="vote('${p}')">${p}</button>`; }
+    else { html+=p+" ❌ مسكّت<br>"; }
+  });
+  html+="<h3>👀 المشاهدين:</h3>";
+  players.forEach(p=>{ if(!alive.includes(p)) html+=p+"<br>"; });
+  document.getElementById('game').innerHTML = html;
+}
+
+// التصويت
+function vote(name){ if(alive.includes(name)) alert("🗳️ تم التصويت ضد "+name); }
+</script>
+
+</body>
+</html>
